@@ -49,7 +49,7 @@ class UnitTest:
         return lambda unit_test: unit_test.category == cat
 
     def change_interval(self, new_int):
-        self.interval_duration = pd.Timedelta(seconds=new_int) 
+        self.interval_duration = pd.Timedelta(seconds=new_int)
         self.results = self.df.resample(self.interval_duration).agg(
             {"Latency": np.mean, "threadName": "count"}
         )
@@ -71,9 +71,9 @@ class Test:
             unit_tests.append(UnitTest(label, df, metric_intervals))
 
         self.unit_tests = unit_tests
-        
         self.metric_intervals = metric_intervals
         self.test_segment_intervals = test_segment_intervals
+        self.results['Segment']
 
     @classmethod
     def read_test(self, location, test_segment_intervals, metric_intervals):
@@ -94,13 +94,13 @@ class Test:
             ]
         ]
         return Test(df)
-    
+
     def update_metric_int(self, new_int):
         '''
         update the metric interval for all the unit tests in test
         '''
         self.unit_tests = [ut.change_interval(new_int) for ut in self.unit_tests]
-        
+
     def gen_colour_dict(self):
         '''
         generate a dictoinary that maps a colour
@@ -116,10 +116,10 @@ class Test:
         # TODO: Show time series graph with a category highlighted, and the rest of the data as 'background'
         pass
 
-    def time_series_by_category(self, focus_category,title):
+    def time_series_by_category(self, focus_category, title, metric='avg_res'):
         focus = [ut for ut in self.unit_tests if ut.has_category(focus_category)]
         bg = [ut for ut in self.unit_tests if not ut.has_category(focus_category)]
-        return self.time_series(focus, bg)
+        return self.time_series(focus, bg, title, metric)
 
     def time_series_unit(self, unit_test_label, title, metric='avg_res'):
         return self.time_series_by_labels([unit_test_label], [], title, metric)
@@ -142,7 +142,7 @@ class Test:
         focus_tests = [ut for ut in self.unit_tests if focus_fn(ut)]
         bg_tests = [ut for ut in self.unit_tests if bg_fn(ut)]
 
-        nlabels = len(focus_tests) + len(bg_tests) #store number of labels, used for legend formatting
+        nlabels = len(focus_tests) + len(bg_tests)  # store number of labels, used for legend formatting
         # Plot a line for each label
         for unit_test in focus_tests:
             # Convert the index (timeStamp) to a column for plotting
@@ -189,8 +189,8 @@ class Test:
 
         # Set the title
         ax.set_title(title)
-        ax.xaxis.set_major_formatter(dates.DateFormatter('%H:%M')) #Format Timestamps on xaxis
-        # Add a legend below the graph, 
+        ax.xaxis.set_major_formatter(dates.DateFormatter('%H:%M'))  # Format Timestamps on xaxis
+        # Add a legend below the graph
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=(nlabels+1)//2)
 
         # Rotate the x-axis tick labels for better visibility (optional)
