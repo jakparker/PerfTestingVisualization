@@ -124,9 +124,9 @@ class Test:
 
     def get_segments(self, segments):
         '''
-        Create new Test of only particular segments 
+        Create new Test of only particular segments
         '''
-        new_df = self.results.loc[self.results['segement'] in segments, :]
+        new_df = self.results[self.results['segment'].isin(segments)]
         return Test(new_df, self.metric_intervals, segmented=True)
 
     def time_series_by_labels(self, focus_labels, bg_labels, title, metric):
@@ -176,6 +176,8 @@ class Test:
                 dataframe[metric],
                 label=unit_test.label,
                 linewidth=3,
+                marker='o',
+                markersize=10
             )
 
         for unit_test in bg_tests:
