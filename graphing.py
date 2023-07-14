@@ -56,7 +56,7 @@ class UnitTest:
 
 
 class Test:
-    def __init__(self, df, test_segment_intervals, metric_intervals):
+    def __init__(self, df, metric_intervals, segmented=False):
         '''
         df: DataFrame to analyze
         test_segment_intervals: Length of each test run
@@ -72,11 +72,24 @@ class Test:
 
         self.unit_tests = unit_tests
         self.metric_intervals = metric_intervals
-        self.test_segment_intervals = test_segment_intervals
-        self.results['Segment']
+
+        if not segmented:
+            # Segment the DF into each run, separated by Token Requests
+            self.results['Segment'] = -1
+
+            indices = self.results[self.results['label'] == 'Token_RTSA'].index
+
+            segment_num = 0
+            for i in indices:
+                # Get all the rows between indicies, set them to segment num
+                self.results.loc[i:indices[indices > i].min(), 'segment'] = segment_num
+                segment_num += 1
+
+            # Set Tokens Back to -1
+            self.results.loc[self.results['label'].str.startswith('Token_'), 'segment'] = -1
 
     @classmethod
-    def read_test(self, location, test_segment_intervals, metric_intervals):
+    def read_test(self, location, metric_intervals):
         imported = pd.read_csv(location)
         df = imported[
             [
@@ -93,18 +106,28 @@ class Test:
                 "Connect",
             ]
         ]
-        return Test(df)
+        return Test(df, metric_intervals)
 
-    def update_metric_int(self, new_int):
+    def update_metric_int(self, interval):
         '''
         update the metric interval for all the unit tests in test
         '''
-        self.unit_tests = [ut.change_interval(new_int) for ut in self.unit_tests]
+        self.unit_tests = [ut.change_interval(interval) for ut in self.unit_tests]
 
     def gen_colour_dict(self):
         '''
-        generate a dictoinary that maps a colour
+        generate a dictoinary that maps a label (key) to a colour (value)
+        To keep consistent colour over graphs
         '''
+        # TODO
+        pass
+
+    def get_segments(self, segments):
+        '''
+        Create new Test of only particular segments 
+        '''
+        new_df = self.results.loc[self.results['segement'] in segments, :]
+        return Test(new_df, self.metric_intervals, segmented=True)
 
     def time_series_by_labels(self, focus_labels, bg_labels, title, metric):
         return self.time_series(
