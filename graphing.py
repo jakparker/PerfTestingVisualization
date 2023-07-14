@@ -117,9 +117,17 @@ class Test:
     def gen_colour_dict(self):
         '''
         generate a dictoinary that maps a label (key) to a colour (value)
-        To keep consistent colour over graphs
+        To keep consistent colour  for each label over graphs
         '''
-        # TODO
+        # TODO #2
+        '''
+        class LineStyle
+            colour
+            marker
+           
+        {label: linestyle} 
+        '''
+        
         pass
 
     def get_segments(self, segments):
@@ -136,7 +144,7 @@ class Test:
         )
 
     def time_series_highlight_category(self, cat):
-        # TODO: Show time series graph with a category highlighted, and the rest of the data as 'background'
+        # TODO: Show time series graph with a category highlighted, and the rest of the data as 'background' #1
         pass
 
     def time_series_by_category(self, focus_category, title, metric='avg_res'):
@@ -147,6 +155,14 @@ class Test:
     def time_series_unit(self, unit_test_label, title, metric='avg_res'):
         return self.time_series_by_labels([unit_test_label], [], title, metric)
 
+    def time_series_dual(self, metric1, metric2):
+        # TODO : Have two metric on the time series graph # 3
+        
+        pass
+
+    def ninety_percentile(self, metric):
+        pass
+        
     def time_series(self, focus_fn, bg_fn, title, metric='avg_res'):
         """
         Create a time series graph
