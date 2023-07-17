@@ -1,3 +1,6 @@
 logs/
 .conda/
 .vscode/
+JMeterReports/
+jmeter.log
+Charts/
