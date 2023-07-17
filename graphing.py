@@ -29,14 +29,16 @@ class UnitTest:
         # Resample the dataframe to 30-second intervals and calculate the average of 'elapsed' and the count of values
         resampled_df = self.df.resample(self.interval_duration).agg(
             {"Latency": np.mean, "threadName": "count"}
-        )
+            )
+
+        error_pct = 100 - self.df['success'].astype(int).resample(self.interval_duration).mean()*100
         # Rename the columns to 'average_elapsed' and 'value_count'
         resampled_df.rename(
             columns={"Latency": "avg_res", "threadName": "txn_per_sec"},
             inplace=True,
         )
         resampled_df["txn_per_sec"] = resampled_df["txn_per_sec"] / interval
-
+        resampled_df['error_pct'] = error_pct
         # Add the resampled dataframe to the interval_dataframes dictionary
         self.results = resampled_df
 
@@ -53,6 +55,13 @@ class UnitTest:
         self.results = self.df.resample(self.interval_duration).agg(
             {"Latency": np.mean, "threadName": "count"}
         )
+        error_pct = 100 - self.df['success'].astype(int).resample(self.interval_duration).mean()*100
+        self.results.rename(
+            columns={"Latency": "avg_res", "threadName": "txn_per_sec"},
+            inplace=True,
+        )
+        self.results["txn_per_sec"] = self.results["txn_per_sec"] / new_int
+        self.results['error_pct'] = error_pct
 
 
 class Test:
@@ -75,6 +84,7 @@ class Test:
 
         if not segmented:
             # Segment the DF into each run, separated by Token Requests
+            # Kinda of Janky way to do this. Want to generalize TODO
             self.results['Segment'] = -1
 
             indices = self.results[self.results['label'] == 'Token_RTSA'].index
@@ -174,7 +184,7 @@ class Test:
         focus_fn and bg_fn are the criteria for being a focus or a background test.
         """
         plt.rcParams["figure.figsize"] = [30, 10]
-
+        plt.rcParams.update({'font.size': 22})
         fig, ax = plt.subplots()
 
         # Store each of the focus and background tests
