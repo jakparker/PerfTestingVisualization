@@ -4,3 +4,5 @@ logs/
 JMeterReports/
 jmeter.log
 Charts/
+setup.cfg
+__pycache__/
