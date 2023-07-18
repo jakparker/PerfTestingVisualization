@@ -3,10 +3,20 @@ import numpy as np
 from matplotlib import pyplot as plt, dates
 
 
+class LineAppearance:
+    def __init__(self, colour=None, marker="o"):
+        """"""
+        # Do we need other aspects here, or is this sufficient?
+        # Will the marker only be present when the test is in the foreground?
+        # TODO: replace this with a cycler/ iterator
+        self.colour = colour
+        self.marker = marker
+
+
 class UnitTest:
     """A processed set of results indicating the average response time and thread rate of a particular action."""
 
-    def __init__(self, label, master_df, interval=60):
+    def __init__(self, label, master_df, interval=60, line_app=LineAppearance()):
         self.label = label
         self.category = label.split("_")[0]
 
@@ -239,6 +249,7 @@ class Test:
                 linewidth=3,
                 marker="o",
                 markersize=10,
+                color=None,
             )
 
         for unit_test in bg_tests:
@@ -250,6 +261,7 @@ class Test:
                 label=unit_test.label,
                 ls="--",
                 alpha=0.5,
+                color=None,
             )
 
         focus_start_times = [ut.start for ut in focus_tests]
