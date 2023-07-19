@@ -6,3 +6,4 @@ jmeter.log
 Charts/
 setup.cfg
 __pycache__/
+__pycache__/graphing.cpython-38.pyc
