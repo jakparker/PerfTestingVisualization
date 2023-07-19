@@ -203,6 +203,10 @@ class Test:
                     # print(ut.label, "| ", ut.category, "|", cat, " |", color)
                     ut.line_app.color = color.copy()
 
+    def assign_line_app_by_labels(self, label_line_app_dict):
+        for label, line_app in label_line_app_dict.items():
+            self.unit_tests_dict[label].line_app = line_app.copy()
+
     def get_segments(self, segments):
         """
         Create new Test of only particular segments
