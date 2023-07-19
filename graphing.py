@@ -4,13 +4,14 @@ from matplotlib import pyplot as plt, dates
 
 
 class LineAppearance:
-    def __init__(self, colour=None, marker="o"):
+    def __init__(self, color=None, marker="o", linestyle="-"):
         """"""
         # Do we need other aspects here, or is this sufficient?
         # Will the marker only be present when the test is in the foreground?
         # TODO: replace this with a cycler/ iterator
-        self.colour = colour
+        self.color = color
         self.marker = marker
+        self.linestyle = linestyle
 
 
 class UnitTest:
@@ -18,7 +19,10 @@ class UnitTest:
 
     def __init__(self, label, master_df, interval=60, line_app=LineAppearance()):
         self.label = label
-        self.category = label.split("_")[0]
+        label_parts = label.split("_")
+        self.category = label_parts[0]
+        self.base = label_parts[-1] == "Base"
+        self.line_app = line_app.copy()
 
         # Pull the relevant rows
         self.df = master_df[master_df["label"] == label].copy()
@@ -61,6 +65,22 @@ class UnitTest:
         return lambda unit_test: unit_test.label in ls
 
     @classmethod
+    def category_is_in(self, ls):
+        return lambda ut: ut.category in ls
+
+    @classmethod
+    def category_is_not_in(self, ls):
+        return lambda ut: ut.category in ls
+
+    @classmethod
+    def base_and_category_is_in(self, ls):
+        return lambda ut: ut.category in ls and ut.base
+
+    @classmethod
+    def not_base_and_category_is_in(self, ls):
+        return lambda ut: ut.category in ls and not ut.base
+
+    @classmethod
     def has_category(self, cat):
         return lambda unit_test: unit_test.category == cat
 
@@ -94,14 +114,16 @@ class Test:
         metric_intervals: interval to average metrics across
         """
         self.results = df
-        unit_tests = []
+        unit_tests_dict = {}
+        unit_tests = unit_tests_dict.values()
 
         self.unique_labels = df["label"].unique()
 
         for label in self.unique_labels:
-            unit_tests.append(UnitTest(label, df, metric_intervals))
+            unit_tests_dict.update({label: UnitTest(label, df, metric_intervals)})
 
         self.unit_tests = unit_tests
+        self.unit_tests_dict = unit_tests_dict
         self.metric_intervals = metric_intervals
 
         if not segmented:
@@ -150,7 +172,7 @@ class Test:
         """
         self.unit_tests = [ut.change_interval(interval) for ut in self.unit_tests]
 
-    def gen_colour_dict(self):
+    def gen_color_dict(self):
         """
         generate a dictoinary that maps a label (key) to a colour (value)
         To keep consistent colour  for each label over graphs
@@ -158,13 +180,28 @@ class Test:
         # TODO #2
         """
         class LineStyle
-            colour
+            color
             marker
            
         {label: linestyle} 
         """
 
         pass
+
+    def reset_line_apps(self):
+        for ut in self.unit_tests:
+            ut.line_app = LineAppearance()
+
+    def assign_color_by_labels(self, label_color_dict):
+        for label, color in label_color_dict.items():
+            self.unit_tests_dict[label].line_app.color = color.copy()
+
+    def assign_color_by_category(self, cat_color_dict):
+        for cat, color in cat_color_dict.items():
+            for ut in self.unit_tests:
+                if ut.category == cat:
+                    # print(ut.label, "| ", ut.category, "|", cat, " |", color)
+                    ut.line_app.color = color.copy()
 
     def get_segments(self, segments):
         """
@@ -173,7 +210,15 @@ class Test:
         new_df = self.results[self.results["segment"].isin(segments)]
         return Test(new_df, self.metric_intervals, segmented=True)
 
-    def time_series_by_labels(self, focus_labels, bg_labels, title, metric):
+    def get_categories(self):
+        categories = set([])
+        for ut in self.unit_tests:
+            categories.add(ut.category)
+        return categories
+
+    def time_series_by_labels(
+        self, focus_labels, bg_labels, title="", metric="avg_res"
+    ):
         """
         Plot a foreground set of labels, and a background set of labels.
         """
@@ -184,28 +229,45 @@ class Test:
             metric,
         )
 
-    def time_series_by_categories(self, focus_cat, bg_cat, title, metric):
-        """
-        Plot a foreground category and background category.
-        """
-        return self.time_series(
-            UnitTest.has_category(focus_cat),
-            UnitTest.has_category(bg_cat),
+    def time_series_by_label(self, foc_label, bg_label, title="", metric="avg_res"):
+        return self.time_series_by_labels(
+            [foc_label],
+            [bg_label],
             title,
             metric,
         )
 
-    def time_series_highlight_category(self, cat, title, metric):
+    def time_series_by_categories(
+        self, focus_cats, bg_cats, title="", metric="avg_res"
+    ):
+        """
+        Plot a set of foreground categories and background categories.
+        """
+        return self.time_series(
+            UnitTest.category_is_in(focus_cats),
+            UnitTest.category_is_in(bg_cats),
+            title,
+            metric,
+        )
+
+    def time_series_by_category(self, focus_cat, bg_cat, title="", metric="avg_res"):
+        """Plot a single focus category against a single background category."""
+        return self.time_series_by_categories([focus_cat], [bg_cat])
+
+    def time_series_highlight_category(self, cat, title="", metric="avg_res"):
+        """Highlight one category, and place on a background of the remaining categories."""
         return self.time_series(
             UnitTest.has_category(cat), UnitTest.not_has_category(cat), title, metric
         )
 
-    def time_series_by_category(self, focus_category, title, metric="avg_res"):
-        focus = [ut for ut in self.unit_tests if ut.has_category(focus_category)]
-        bg = [ut for ut in self.unit_tests if not ut.has_category(focus_category)]
-        return self.time_series(focus, bg, title, metric)
+    def time_series_categories_against_base(self, cats, title="", metric="avg_res"):
+        """Plot a set of categories against the base(s) in those categories."""
+        return self.time_series(
+            UnitTest.not_base_and_category_is_in(cats),
+            UnitTest.base_and_category_is_in(cats),
+        )
 
-    def time_series_unit(self, unit_test_label, title, metric="avg_res"):
+    def time_series_unit(self, unit_test_label, title="", metric="avg_res"):
         return self.time_series_by_labels([unit_test_label], [], title, metric)
 
     def time_series_dual(self, metric1, metric2):
@@ -216,7 +278,7 @@ class Test:
     def ninety_percentile(self, metric):
         pass
 
-    def time_series(self, focus_fn, bg_fn, title, metric="avg_res"):
+    def time_series(self, focus_fn, bg_fn, title="", metric="avg_res"):
         """
         Create a time series graph
 
@@ -246,10 +308,11 @@ class Test:
                 dataframe["timeStamp"],
                 dataframe[metric],
                 label=unit_test.label,
-                linewidth=3,
-                marker="o",
-                markersize=10,
-                color=None,
+                linewidth=10,
+                marker=unit_test.line_app.marker,
+                markersize=1,
+                color=unit_test.line_app.color,
+                ls=unit_test.line_app.linestyle,
             )
 
         for unit_test in bg_tests:
@@ -260,8 +323,8 @@ class Test:
                 dataframe[metric],
                 label=unit_test.label,
                 ls="--",
-                alpha=0.5,
-                color=None,
+                alpha=0.7,
+                color=unit_test.line_app.color,
             )
 
         focus_start_times = [ut.start for ut in focus_tests]
@@ -299,4 +362,4 @@ class Test:
         plt.xticks(rotation=45)
         plt.grid()
         # Display the plot
-        plt.show()
+        plt.show
