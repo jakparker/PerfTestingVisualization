@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt, dates
-import copy
+
 
 class LineAppearance:
     def __init__(self, color=None, marker="o", linestyle="-"):
@@ -12,7 +12,7 @@ class LineAppearance:
         self.color = color
         self.marker = marker
         self.linestyle = linestyle
-    
+
     # def __copy__(self):
     #     copy_instance = LineAppearance()
     #     copy_instance.color = self.color
@@ -132,6 +132,7 @@ class Test:
         self.unit_tests_dict = unit_tests_dict
         self.metric_intervals = metric_intervals
 
+        segment_num = 0
         if not segmented:
             # Segment the DF into each run, separated by Token Requests
             # Kinda of Janky way to do this. Want to generalize TODO
@@ -139,7 +140,6 @@ class Test:
 
             indices = self.results[self.results["label"] == "Token_Request"].index
 
-            segment_num = 0
             for i in indices:
                 # Get all the rows between indicies, set them to segment num
                 self.results.loc[
@@ -151,6 +151,9 @@ class Test:
             self.results.loc[
                 self.results["label"].str.startswith("Token_"), "segment"
             ] = -1
+
+        self.segment_num = segment_num
+        self.segmented = segmented
 
     @classmethod
     def read_test(self, location, metric_intervals):
@@ -193,6 +196,59 @@ class Test:
         """
 
         pass
+
+    def get_avg_res_by_label(self, focus_label, bg_label):
+        segment_avg_res_times = []
+        for i in range(self.segment_num):
+            segment = self.get_segments([i])
+            if (
+                focus_label in segment.unique_labels
+                and bg_label in segment.unique_labels
+            ):
+                avg_res = segment.get_summary_metrics().at[focus_label, "mean"]
+                segment_avg_res_times.append(avg_res)
+
+        return np.mean(segment_avg_res_times)
+
+    def get_summary_metrics(self):
+        """Get count, mean, quantiles and other data. Only works correctly for a segment (the total duration is wrong)"""
+        if self.segmented:
+            total_seconds = (
+                self.results["timeStamp"].max() - self.results["timeStamp"].min()
+            ) / 1000
+            summary_metrics = self.results.groupby("label")["Latency"].agg(
+                [
+                    "count",
+                    "mean",
+                    "median",
+                    "min",
+                    "max",
+                    lambda x: x.quantile(0.9),
+                    lambda x: x.quantile(0.95),
+                    lambda x: x.quantile(0.99),
+                    lambda x: x.shape[0] / total_seconds,
+                ]
+            )
+            return summary_metrics
+        else:
+            # A quick fix; not ideal.
+            return pd.DataFrame({"Error": ["not_segmented"]})
+
+    def get_summary_metrics_by_segment(self):
+        summary_metrics_list = []
+        for i in range(self.segment_num):
+            print("Segment:", i)
+            segment = self.get_segments([i])
+            # Append the results to the list
+            summary_metrics_list.append(segment.get_summary_metrics())
+        summary_metrics = pd.concat(
+            summary_metrics_list, keys=range(11), names=["Segment"]
+        )
+        return summary_metrics
+
+    def export_summary_metrics_by_segment(self, path="seg_stats.csv"):
+        summary_metrics = self.get_summary_metrics_by_segment()
+        summary_metrics.to_csv(path)
 
     def reset_line_apps(self):
         for ut in self.unit_tests:
