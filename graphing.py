@@ -24,7 +24,14 @@ class LineAppearance:
 class UnitTest:
     """A processed set of results indicating the average response time and thread rate of a particular action."""
 
-    def __init__(self, label, master_df, interval=60, line_app=LineAppearance()):
+    def __init__(
+        self,
+        label,
+        master_df,
+        interval=60,
+        ignore_error_pct=False,
+        line_app=LineAppearance(),
+    ):
         self.label = label
         label_parts = label.split("_")
         self.category = label_parts[0]
@@ -51,18 +58,20 @@ class UnitTest:
             {"Latency": np.mean, "threadName": "count"}
         )
 
-        error_pct = (
-            100
-            - self.df["success"].astype(int).resample(self.interval_duration).mean()
-            * 100
-        )
+        if not ignore_error_pct:
+            error_pct = (
+                100
+                - self.df["success"].astype(int).resample(self.interval_duration).mean()
+                * 100
+            )
+            resampled_df["error_pct"] = error_pct
         # Rename the columns to 'average_elapsed' and 'value_count'
         resampled_df.rename(
             columns={"Latency": "avg_res", "threadName": "txn_per_sec"},
             inplace=True,
         )
         resampled_df["txn_per_sec"] = resampled_df["txn_per_sec"] / interval
-        resampled_df["error_pct"] = error_pct
+
         # Add the resampled dataframe to the interval_dataframes dictionary
         self.results = resampled_df
 
@@ -111,9 +120,15 @@ class UnitTest:
         self.results["txn_per_sec"] = self.results["txn_per_sec"] / new_int
         self.results["error_pct"] = error_pct
 
+    def interpolate_avg_res(self):
+        """Fill in missing average response times linearly"""
+        self.results.interpolate(
+            method="linear", limit_direction="forward", inplace=True
+        )
+
 
 class Test:
-    def __init__(self, df, metric_intervals, segmented=False):
+    def __init__(self, df, metric_intervals, segmented=False, ignore_error_pct=False):
         """
         df: DataFrame to analyze
         test_segment_intervals: Length of each test run
@@ -126,7 +141,9 @@ class Test:
         self.unique_labels = df["label"].unique()
 
         for label in self.unique_labels:
-            unit_tests_dict.update({label: UnitTest(label, df, metric_intervals)})
+            unit_tests_dict.update(
+                {label: UnitTest(label, df, metric_intervals, ignore_error_pct)}
+            )
 
         self.unit_tests = unit_tests
         self.unit_tests_dict = unit_tests_dict
@@ -174,6 +191,16 @@ class Test:
             ]
         ]
         return Test(df, metric_intervals)
+
+    @classmethod
+    def read_test_untouched(self, location, metric_intervals):
+        imported = pd.read_csv(location)
+        return Test(imported, metric_intervals)
+
+    def unit_tests_interpolate_avg_res(self):
+        """Fill in missing average response times linearly for all unit tests."""
+        for ut in self.unit_tests:
+            ut.interpolate_avg_res()
 
     def update_metric_int(self, interval):
         """
@@ -283,7 +310,7 @@ class Test:
         return categories
 
     def time_series_by_labels(
-        self, focus_labels, bg_labels, title="", metric="avg_res"
+        self, focus_labels, bg_labels, title="", metric="avg_res", ylabel=None
     ):
         """
         Plot a foreground set of labels, and a background set of labels.
@@ -293,6 +320,7 @@ class Test:
             UnitTest.label_is_in(bg_labels),
             title,
             metric,
+            ylabel,
         )
 
     def time_series_by_label(self, foc_label, bg_label, title="", metric="avg_res"):
@@ -333,8 +361,10 @@ class Test:
             UnitTest.base_and_category_is_in(cats),
         )
 
-    def time_series_unit(self, unit_test_label, title="", metric="avg_res"):
-        return self.time_series_by_labels([unit_test_label], [], title, metric)
+    def time_series_unit(
+        self, unit_test_label, title="", metric="avg_res", ylabel=None
+    ):
+        return self.time_series_by_labels([unit_test_label], [], title, metric, ylabel)
 
     def time_series_dual(self, metric1, metric2):
         # TODO : Have two metric on the time series graph # 3
@@ -344,7 +374,13 @@ class Test:
     def ninety_percentile(self, metric):
         pass
 
-    def time_series(self, focus_fn, bg_fn, title="", metric="avg_res"):
+    def time_series(self, focus_fn, bg_fn, title="", metric="avg_res", ylabel=None):
+        self.create_time_series_plot(focus_fn, bg_fn, title, metric, ylabel)
+        plt.show()
+
+    def create_time_series_plot(
+        self, focus_fn, bg_fn, title="", metric="avg_res", ylabel=None
+    ):
         """
         Create a time series graph
 
@@ -409,11 +445,15 @@ class Test:
         except ValueError:
             pass
         # Set the y-axis label
-        if metric == "avg_res":
-            ax.set_ylabel("Response Time (ms)")
-        elif metric == "txn_per_sec":
-            ax.set_ylabel("Transactions Per Second")
+        if ylabel is None:
+            if metric == "avg_res":
+                ax.set_ylabel("Response Time (ms)")
+            elif metric == "txn_per_sec":
+                ax.set_ylabel("Transactions Per Second")
+        else:
+            ax.set_ylabel(ylabel)
 
+        ax.set_xlabel("Time")
         # Set the title
         ax.set_title(title)
         ax.xaxis.set_major_formatter(
@@ -421,11 +461,10 @@ class Test:
         )  # Format Timestamps on xaxis
         # Add a legend below the graph
         ax.legend(
-            loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=(nlabels + 1) // 2
+            loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=(nlabels + 1) // 2
         )
 
         # Rotate the x-axis tick labels for better visibility (optional)
         plt.xticks(rotation=45)
         plt.grid()
-        # Display the plot
-        plt.show
+        return plt
