@@ -44,7 +44,7 @@ class UnitTest:
         self.interval_duration = pd.Timedelta(seconds=interval)
 
         # Convert the 'timeStamp' column to datetime if it's not already
-        self.df["timeStamp"] = pd.to_datetime(self.df["timeStamp"], unit="ms")
+        self.df["timeStamp"] = pd.to_datetime(self.df["timeStamp"], unit="ms", utc = True).dt.tz_convert('Australia/ACT')
 
         # Store the start and end times of the test before resampling
         self.start = self.df["timeStamp"].min()
@@ -67,10 +67,10 @@ class UnitTest:
             resampled_df["error_pct"] = error_pct
         # Rename the columns to 'average_elapsed' and 'value_count'
         resampled_df.rename(
-            columns={"Latency": "avg_res", "threadName": "txn_per_sec"},
+            columns={"Latency": "avg_res", "threadName": "txn_per_hr"},
             inplace=True,
         )
-        resampled_df["txn_per_sec"] = resampled_df["txn_per_sec"] / interval
+        resampled_df["txn_per_hr"] = (resampled_df["txn_per_hr"] / interval)*3600
 
         # Add the resampled dataframe to the interval_dataframes dictionary
         self.results = resampled_df
@@ -114,10 +114,10 @@ class UnitTest:
             * 100
         )
         self.results.rename(
-            columns={"Latency": "avg_res", "threadName": "txn_per_sec"},
+            columns={"Latency": "avg_res", "threadName": "txn_per_hr"},
             inplace=True,
         )
-        self.results["txn_per_sec"] = self.results["txn_per_sec"] / new_int
+        self.results["txn_per_hr"] = self.results["txn_per_hr"] / new_int
         self.results["error_pct"] = error_pct
 
     def interpolate_avg_res(self):
@@ -155,7 +155,7 @@ class Test:
             # Kinda of Janky way to do this. Want to generalize TODO
             self.results["Segment"] = -1
 
-            indices = self.results[self.results["label"] == "Token_Request"].index
+            indices = self.results[self.results["label"] == "Token Request"].index
 
             for i in indices:
                 # Get all the rows between indicies, set them to segment num
@@ -168,6 +168,7 @@ class Test:
             self.results.loc[
                 self.results["label"].str.startswith("Token_"), "segment"
             ] = -1
+            self.segmented = True
 
         self.segment_num = segment_num
         self.segmented = segmented
@@ -232,7 +233,7 @@ class Test:
                 focus_label in segment.unique_labels
                 and bg_label in segment.unique_labels
             ):
-                avg_res = segment.get_summary_metrics().at[focus_label, "mean"]
+                avg_res = segment.get_summary_metrics().at[focus_label, "median"]
                 segment_avg_res_times.append(avg_res)
 
         return np.mean(segment_avg_res_times)
@@ -253,7 +254,7 @@ class Test:
                     lambda x: x.quantile(0.9),
                     lambda x: x.quantile(0.95),
                     lambda x: x.quantile(0.99),
-                    lambda x: x.shape[0] / total_seconds,
+                    lambda x: (x.shape[0] / total_seconds)*3600,
                 ]
             )
             return summary_metrics
@@ -269,7 +270,7 @@ class Test:
             # Append the results to the list
             summary_metrics_list.append(segment.get_summary_metrics())
         summary_metrics = pd.concat(
-            summary_metrics_list, keys=range(11), names=["Segment"]
+            summary_metrics_list, keys=range(self.segment_num), names=["Segment"]
         )
         return summary_metrics
 
@@ -448,8 +449,8 @@ class Test:
         if ylabel is None:
             if metric == "avg_res":
                 ax.set_ylabel("Response Time (ms)")
-            elif metric == "txn_per_sec":
-                ax.set_ylabel("Transactions Per Second")
+            elif metric == "txn_per_hr":
+                ax.set_ylabel("Transactions Per Hour")
         else:
             ax.set_ylabel(ylabel)
 
